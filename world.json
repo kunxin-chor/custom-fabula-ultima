@@ -1,0 +1,14 @@
+{
+  "title": "Custom Fabula",
+  "id": "custom-fabula",
+  "system": "custom-system-builder",
+  "coreVersion": "10.291",
+  "compatibility": {
+    "minimum": "10",
+    "verified": "10"
+  },
+  "esmodules": [
+    "world.js"
+  ],
+  "systemVersion": "2.2.4"
+}
