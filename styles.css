@@ -79,6 +79,10 @@
 .pl-4 { padding-left: 1.5rem; }
 .pl-5 { padding-left: 3rem; }
 
+.attribute-table td {
+  vertical-align: top;
+}
+
 .custom-system-rich-content {
   border: 1px solid black;
   padding: 0.5rem;
@@ -113,3 +117,4 @@
   color: inherit;
   text-decoration: inherit;
 }
+
