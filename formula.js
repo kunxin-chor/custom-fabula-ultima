@@ -105,5 +105,103 @@ ${ ref('equipped') ? ref('armorDefense') : 0}$
 ${ ref('equipped') ? ref('armorMagicDefense') : 0}$
 ${ ref('equipped') ? ref('martial') : 0}$
 
+FORMULA FOR MONSTER ATTACK
+<h2>${!sameRow('attackName')}$</h2>
+<hr/>
+
+${#dice1:= equalText(string(sameRow('weaponStat1')) ,'DEX') == true ? ref('currentDex') : 0}$
+${#dice1:= equalText(string(sameRow('weaponStat1')) ,'INS') == true and isZero(dice1) == true ? ref('currentIns') : dice1}$
+${#dice1:= equalText(string(sameRow('weaponStat1')) ,'MIG') == true and isZero(dice1) == true ? ref('currentMig') : dice1}$
+${#dice1:= equalText(string(sameRow('weaponStat1')) ,'WLP') == true and isZero(dice1) == true ? ref('currentWlp') : dice1}$
+
+${#dice2:= equalText(string(sameRow('weaponStat2')) ,'DEX') == true ? ref('currentDex') : 0}$ 
+${#dice2:= equalText(string(sameRow('weaponStat2')) ,'INS') == true and isZero(dice2) == true ? ref('currentIns') : dice2}$
+${#dice2:= equalText(string(sameRow('weaponStat2')) ,'MIG') == true and isZero(dice2) == true ? ref('currentMig') : dice2}$
+${#dice2:= equalText(string(sameRow('weaponStat2')) ,'WLP') == true and isZero(dice2) == true ? ref('currentWlp') : dice2}$
+
+<p><b>${!string(sameRow('weaponStat1'))}$</b> = 1d${!dice1}$ = ${D1:=[1d:dice1:]}$</p>
+
+<p><b>${!string(sameRow('weaponStat2'))}$</b> = 1d${!dice2}$ = ${D2:=[1d:dice2:]}$</p>
+
+<p><b>Check:</b> ${!D1}$ + ${!D2}$ + ${sameRow('accuracyModifier')}$  + ${ref('accuracyModifier')}$ = <b>${D1+D2+sameRow('accuracyModifier')+ref('accuracyModifier')}$</b> vs. DEF</p>
+ 
+<p><b>Damage:</b> HR + ${!sameRow('damageBonus')}$  = <b>${max(D1, D2)+sameRow('damageBonus')}$</b>  ${!sameRow('damageType')}$</p>
+
+${! largerEq(D1, 6) and D1 == D2 ? string('<p><b>CRITICAL SUCCESS! Gain an Opportunity</b></p>'): string('')}$
+
+${!D1 == D2 and D1 == 1 ? string('<p><b>FUMBLE<b></p>'): string('')}$
+*/
+
+/*
+Roll ability
+
+
+<h2>${!item.spellName}$</h2>
+<hr/>
+<div>
+<p>Effect: ${sameRow('effect')}$</p>
+<p>Targets: ${sameRow('targets')}$</p>
+</div>
+
+${#dice1:= equalText(string(item.stat1) ,'DEX') == true ? ref('currentDex') : 0}$
+${#dice1:= equalText(string(item.stat1) ,'INS') == true and isZero(dice1) == true ? ref('currentIns') : dice1}$
+${#dice1:= equalText(string(item.stat1) ,'MIG') == true and isZero(dice1) == true ? ref('currentMig') : dice1}$
+${#dice1:= equalText(string(item.stat1) ,'WLP') == true and isZero(dice1) == true ? ref('currentWlp') : dice1}$
+
+${#dice2:= equalText(string(item.stat2) ,'DEX') == true ? ref('currentDex') : 0}$ 
+${#dice2:= equalText(string(item.stat2) ,'INS') == true and isZero(dice2) == true ? ref('currentIns') : dice2}$
+${#dice2:= equalText(string(item.stat2) ,'MIG') == true and isZero(dice2) == true ? ref('currentMig') : dice2}$
+${#dice2:= equalText(string(item.stat2) ,'WLP') == true and isZero(dice2) == true ? ref('currentWlp') : dice2}$
+
+<p><b>${!string(item.stat1)}$</b> = 1d${!dice1}$ = ${D1:=[1d:dice1:]}$</p>
+
+<p><b>${!string(item.stat2)}$</b> = 1d${!dice2}$ = ${D2:=[1d:dice2:]}$</p>
+
+<p><b>Check:</b> ${!D1}$ + ${!D2}$ + ${item.checkModifier}$  + ${ref('accuracyModifier')}$ = <b>${D1+D2+item.checkModifier+accuracyModifier}$</b> vs. DEF</p>
+ 
+<p><b>Potency:</b> HR + ${!sameRow('potency')}$  = <b>${max(D1, D2)+sameRow('potency')}$</b>  ${!item.element}$</p>
+
+${! largerEq(D1, 6) and D1 == D2 ? string('<p><b>CRITICAL SUCCESS! Gain an Opportunity</b></p>'): string('')}$
+
+${!D1 == D2 and D1 == 1 ? string('<p><b>FUMBLE<b></p>'): string('')}$
+
+
+
+
+Roll NPC Ability
+
+
+<h2>${!sameRow('spellName')}$</h2>
+<hr/>
+<div>
+<p>Effect: ${sameRow('effect')}$</p>
+<p>Targets: ${sameRow('targets')}$</p>
+${sameRow('description')}$
+</div>
+
+${#dice1:= equalText(string(sameRow('stat1')) ,'DEX') == true ? ref('currentDex') : 0}$
+${#dice1:= equalText(string(sameRow('stat1')) ,'INS') == true and isZero(dice1) == true ? ref('currentIns') : dice1}$
+${#dice1:= equalText(string(sameRow('stat1')) ,'MIG') == true and isZero(dice1) == true ? ref('currentMig') : dice1}$
+${#dice1:= equalText(string(sameRow('stat1')) ,'WLP') == true and isZero(dice1) == true ? ref('currentWlp') : dice1}$
+
+${#dice2:= equalText(string(sameRow('stat2')) ,'DEX') == true ? ref('currentDex') : 0}$ 
+${#dice2:= equalText(string(sameRow('stat2')) ,'INS') == true and isZero(dice2) == true ? ref('currentIns') : dice2}$
+${#dice2:= equalText(string(sameRow('stat2')) ,'MIG') == true and isZero(dice2) == true ? ref('currentMig') : dice2}$
+${#dice2:= equalText(string(sameRow('stat2')) ,'WLP') == true and isZero(dice2) == true ? ref('currentWlp') : dice2}$
+
+<p><b>${!string(sameRow('stat1'))}$</b> = 1d${!dice1}$ = ${D1:=[1d:dice1:]}$</p>
+
+<p><b>${!string(sameRow('stat2'))}$</b> = 1d${!dice2}$ = ${D2:=[1d:dice2:]}$</p>
+
+<p><b>Check:</b> ${!D1}$ + ${!D2}$ + ${sameRow('checkModifier')}$  + ${ref('accuracyModifier')}$ = <b>${D1+D2+sameRow('checkModifier')+accuracyModifier}$</b> vs. DEF</p>
+ 
+<p><b>Potency:</b> HR + ${!sameRow('potency')}$  = <b>${max(D1, D2)+sameRow('potency')}$</b>  ${!sameRow('element')}$</p>
+
+${! largerEq(D1, 6) and D1 == D2 ? string('<p><b>CRITICAL SUCCESS! Gain an Opportunity</b></p>'): string('')}$
+
+${!D1 == D2 and D1 == 1 ? string('<p><b>FUMBLE<b></p>'): string('')}$
+
 
 */
+
+
