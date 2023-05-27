@@ -1,7 +1,211 @@
+import { runActionTracker } from "./action-tracker.js";
+
+runActionTracker();
+
 // Foundry VTT world script
 Hooks.on('ready', () => {
     console.log("Fabula Ultima World Script Ready");
 });
+
+Hooks.on('preCreateChatMessage', (document, data) => {
+    console.log("document =", document);
+    
+    const customRoll = document.content.includes("custom-system-roll");
+    if(customRoll) {
+        console.log("adding target names to roll message")
+        // Get the game's targeted tokens
+        let targetedTokens = game.user.targets;
+
+        // get the token of the attacking actor 
+        // if it is the GM, get the selected token
+        // if player, get the player's controlled token  
+        let attackingToken = null;
+        if (game.user.isGM) {
+            attackingToken = canvas.tokens.controlled[0];
+        } else {
+            attackingToken = game.user.character.getActiveTokens()[0];
+        }
+        console.log(attackingToken);
+        
+
+        // Create a container for the target names as a string
+        let targetNames = "<ul class='target-names'>";
+
+        // get the result of the roll from the message
+        let rollResultMessage = document.content.match(/<span class="hidden roll-result">(\d+)<\/span>/);
+        let targetDefenseMessage = document.content.match(/<span class="hidden roll-target-defense">([^<]*)<\/span>/);
+        let damageTypeMessage = document.content.match(/<span class="hidden roll-damage-type">([^<]*)<\/span>/);
+        let damageNumberMessage = document.content.match(/<span class="hidden roll-damage">(\d+)<\/span>/);
+        const rollResult = rollResultMessage ? parseInt(rollResultMessage[1]) : null;
+        const targetedDefense = targetDefenseMessage ? targetDefenseMessage[1] : null;
+        const damageType = damageTypeMessage ? damageTypeMessage[1] : "untyped";      
+        let mpCostMessage = document.content.match(/<span class="hidden roll-MP-cost">(\d+)<\/span>/);
+        let mpCost = mpCostMessage ? parseInt(mpCostMessage[1]) : null;       
+        // add a button to deduct button inside the roll message if the span with class "roll-MP-cost" exists into
+        // the span.mp-cost-button
+        if (mpCost) {
+       
+            console.log("MP cost =", mpCost);
+            // embed the _id of the attacking actor in the button
+            let mpCostButton = `<button class="deduct-mp ml-1 damage-button" data-token-id="${attackingToken.document._id}" data-mp-cost="${mpCost}">Apply</button>`;
+            // add the button to the roll message
+            document.content = document.content.replace(/<span class="mp-cost-button"><\/span>/, mpCostButton);
+        }
+
+        // Loop through each targeted token, add its details and name to the roll message
+        for(let token of targetedTokens) {        
+
+            // Create an element for the token's name as a string
+            let tokenName = "";
+            tokenName += `<li class='token-name' data-token-id='${token.id}'>`; // Store the token's ID for later use
+
+            // Check if the attack hit or missed
+
+            // if targetedDefense is "DEF", compare with 'currentDefense'
+            // if targetedDefense is "MDF", compare with 'currentMagicDefense'
+            // if targetedDefense is "N/A", it's an automatic hit
+
+            let key = "";
+            switch (targetedDefense) {
+                case "DEF":
+                    key = "currentDefense";
+                    break;
+                case "M.DEF":
+                    key = "currentMagicDefense";
+                    break;
+                case "N/A":
+                    key = "N/A";
+                    break;
+                default:
+                    key = "currentDefense";
+                    break;
+            }
+                       
+            let hitOrMiss = "hit";
+            if (key != "N/A" && key != "n/a") {
+                hitOrMiss = (rollResult >= token.actor.system.props[key]) ? "hit" : "miss";
+            }                      
+
+            // determine the target's affinity to the damage type
+            // make sure it's not "n/a" damage type first before finding the affinitiy
+            let affinity = damageType.toLowerCase() != "untyped" ? token.actor.system.props[damageType + "Affinity"][0].toLowerCase()
+              : "n";
+            if (affinity == "-") {
+                affinity = "n";
+            }       
+
+            // Add hit or miss result to the token's name
+            tokenName += `${token.name} - ${hitOrMiss} (affinity: ${affinity})
+                <div>
+                    <i class="fa-solid fa-plus-minus"></i>
+                    <input type="number" class="damage-modifier" value="0" />
+                    <input type="radio" value="2"   name="damage-multipler-${document.timestamp}" class="damage-multiplier" /> x2
+                    <input type="radio" value="1"   name="damage-multipler-${document.timestamp}" class="damage-multiplier" checked /> x1
+                    <input type="radio" value="0.5" name="damage-multipler-${document.timestamp}" class="damage-multiplier" /> x0.5
+                    <button class="damage-button">Apply</button>
+                </div>
+            </li>`;
+
+            // Add the token name to the container
+            targetNames += tokenName;
+        }
+
+        // Close the container string
+        targetNames += "</ul>";
+
+        // Add the target names to the chat message
+        document.content += targetNames;
+
+        if (document.content !== data.content) {
+            document.updateSource({
+                content: document.content
+            });
+        }
+    }
+});
+
+Hooks.on('renderChatMessage', (message, element, data) => {
+   
+        // check if the deduct MP button exists. 
+        // if it does, add a click listener to it
+        let mpCostButton = element[0].querySelector(".deduct-mp");
+        if (mpCostButton) {
+            mpCostButton.addEventListener("click", (event) => {
+                // get the actor ID from the button
+                const tokenId = event.target.dataset.tokenId;
+                console.log("t")
+                const mpCost = event.target.dataset.mpCost;
+                // get the actor from the token ID
+                const actor = canvas.tokens.get(tokenId).actor;
+                // deduct the MP cost from the actor
+                const mpKey = actor.system.props.rank ? "MP" : "currentMp";
+                console.log(mpCost, mpKey, actor.system.props[mpKey]);
+                actor.update({
+                    [`system.props.${mpKey}`]: actor.system.props[mpKey] - mpCost
+                });
+            });
+        }
+
+        // add a hover listener to each of the token name
+        let tokenNames = element[0].querySelectorAll(".token-name");
+        for(let tokenName of tokenNames) {
+            tokenName.addEventListener("mouseenter", (event) => {
+                // hover the token using foundry VTT code
+                const tokenId = event.target.dataset.tokenId;
+                let token = canvas.tokens.get(tokenId);
+                token._onHoverIn(event);
+    
+            })
+            tokenName.addEventListener("mouseleave", (event) => {
+                // hover the token using foundry VTT code
+                const tokenId = event.target.dataset.tokenId;
+                let token = canvas.tokens.get(tokenId);
+                token._onHoverOut(event);
+            })
+
+            // add a click listener to each of the damage buttons
+            let damageButtons = tokenName.querySelectorAll(".damage-button");
+            
+            // get the damage amount from the <span class="hidden roll-damage"> element
+            let damage = element[0].querySelector(".roll-damage").innerHTML;
+
+            for(let damageButton of damageButtons) {
+                damageButton.addEventListener("click", (event) => {
+                    // get the damage multiplier
+                    let damageMultiplier = 1;
+                    let selectedDamageMultiplier = tokenName.querySelector(".damage-multiplier:checked");
+                    if (selectedDamageMultiplier) {
+                        damageMultiplier = selectedDamageMultiplier.value;
+                    }
+                    
+                    // get the damage modifier
+                    let damageModifier = tokenName.querySelector(".damage-modifier").value;
+                    damageModifier = parseInt(damageModifier);
+                    damage = parseInt(damage);
+                    
+                    console.log(damage, damageModifier, damageMultiplier);
+
+                    // update the token's actor
+                    const tokenId = event.target.parentElement.parentElement.dataset.tokenId;
+                    let token = canvas.tokens.get(tokenId);
+                    let actor = token.actor;
+                    // if actor.system.props.rank is defined, then it's a NPC (then take HP)
+                    // otherwise it's a PC (then take currentHp)
+                    const hitPointKey = actor.system.props.rank ? "HP" : "currentHp";
+                    let currentHP = actor.system.props[hitPointKey];
+                    let newHP = currentHP - (damage + damageModifier) * damageMultiplier;
+                    console.log(hitPointKey, currentHP, newHP);
+                    actor.update({
+                         [`system.props.${hitPointKey}`]: newHP
+                    });
+
+                })
+            }
+        }
+    
+});
+
+
 
 Hooks.on('renderActorSheet', (app, html, data) => {
     const sheetBody = html[0];
@@ -13,10 +217,9 @@ Hooks.on('renderActorSheet', (app, html, data) => {
         return;
     }
     const templateName = templateSelect.options[templateSelect.selectedIndex].innerHTML;
-    console.log("template name=", templateName);
 
     const header = sheetBody.querySelector(".custom-system-customHeader");
-    console.log("header =", header);
+
     if (header && data.document.type == "character" && templateName == "fb_npc") {
         console.log("executing");
         const newDiv = document.createElement("div");
@@ -51,15 +254,13 @@ Hooks.on('renderActorSheet', (app, html, data) => {
         // Insert the new div after the last div with the same class
         header.appendChild(newDiv);
     }
-})
-
-
-
+});
 
 Hooks.on('renderItemSheet', (app, html, data) => {
     const sheetBody = html[0];
     // select the last div with .custom-system-sheet-actions
     const header = sheetBody.querySelector(".custom-system-customHeader");
+    console.log(data);
 
     if (header && data.document.type == "equippableItem") {
         const newDiv = document.createElement("div");
@@ -199,8 +400,8 @@ to: {"HP":"2","maxHP":"0","MP":"0","maxMP":"0","init":"0","magicDefenseModifier"
 */
 const parseNPCJsonToFoundryFormat = (reactJson) => {
     reactJson = JSON.parse(reactJson);
-    const maxHP = (reactJson.attributes.MIG * 5 + parseInt(reactJson.level)) * 2 + reactJson.skillOptions.improved_hit_points * reactJson.rank;
-    const maxMP = (reactJson.attributes.WLP * 5 + parseInt(reactJson.level)) * (parseInt(reactJson.rank) > 2 ? 2 : 1);
+    const maxHP = (reactJson.attributes.MIG * 5 + parseInt(reactJson.level) * 2 + reactJson.skillOptions.improved_hit_points) * reactJson.rank;
+    const maxMP = (reactJson.attributes.WLP * 5 + parseInt(reactJson.level) + reactJson.skillOptions.improved_mp) * (parseInt(reactJson.rank) > 2 ? 2 : 1);
     /*
     const converted = {
         name: reactJson.name,
@@ -227,7 +428,7 @@ const parseNPCJsonToFoundryFormat = (reactJson) => {
     }
     */
 
-    const selectedArmorDefense = reactJson.selected_armor?.armor?.defense;
+    const selectedArmorDefense = reactJson.selected_armor?.armor?.defense?.match(/\d+/)?.[0] ?? 0;;
     const selectedArmorMagicDefense = reactJson.selected_armor?.armor?.magicDefense?.match(/\d+/)?.[0] ?? 0;
     const selectedShieldDefense = reactJson.selected_shield?.shield.defense;
     const selectedShieldMagicDefense = reactJson.selected_shield?.shield?.magicDefense;
@@ -240,11 +441,15 @@ const parseNPCJsonToFoundryFormat = (reactJson) => {
         return acc + defense["magic-defense"];
     }, 0);
 
+    /* base initiative is (DEX + INS) / 2 */
+    const baseInitiative = (parseInt(reactJson.attributes.DEX) + parseInt(reactJson.attributes.INS)) / 2;
+
     const converted = {
         name: reactJson.name,
         "system.props.rank": reactJson.rank,
         "system.props.level": reactJson.level,
         "system.props.species": reactJson.species,
+        "system.props.traits": reactJson.traits,
         "system.props.HP": maxHP,
         "system.props.maxHP": maxHP,
         "system.props.MP": maxMP,
@@ -254,7 +459,7 @@ const parseNPCJsonToFoundryFormat = (reactJson) => {
         "system.props.baseMig": reactJson.attributes.MIG,
         "system.props.baseWlp": reactJson.attributes.WLP,
         "system.props.martialArmor": reactJson.selected_armor?.armor?.martial || false,
-        "system.props.init": reactJson.initiative + reactJson.skillOptions.improved_initative + (reactJson.rank - 1),
+        "system.props.init": baseInitiative + reactJson.initiative + reactJson.skillOptions.improved_initative + (reactJson.rank - 1),
         "system.props.defenseModifier": defenseModifier + (parseInt(selectedShieldDefense) || 0) + (reactJson.selected_armor?.armor?.martial ? 0 : parseInt(selectedArmorDefense) || 0),
         "system.props.martialArmorDefense": reactJson.selected_armor?.armor?.martial ? parseInt(selectedArmorDefense?.match(/\d+/)?.[0]) : 0,
         "system.props.magicDefenseModifier": magicDefenseModifier + (parseInt(selectedShieldMagicDefense) || 0) + (parseInt(selectedArmorMagicDefense) || 0),
@@ -262,7 +467,6 @@ const parseNPCJsonToFoundryFormat = (reactJson) => {
 
 
     const accuracyModifier = Math.floor(reactJson.level / 10) + (reactJson.skillOptions.specialized.accuracy ? 3 : 0);
-    console.log("accuracyModifier =", accuracyModifier);
     const offensiveMagicCheckBonus = Math.floor(reactJson.level / 10) + (reactJson.skillOptions.specialized.magic ? 3 : 0);
     const opposedChecks = reactJson.skillOptions.specialized["opposed-checks"] ? 3 : 0;
 
@@ -275,12 +479,43 @@ const parseNPCJsonToFoundryFormat = (reactJson) => {
             weaponStat1: attack.stat1 || "DEX",
             weaponStat2: attack.stat2 || "DEX",
             damageType: attack.element || "physical",
+            effect: attack.specialEffect || "",
             roll: '',
-
-
         };
         return acc;
     }, {});
+
+    // special rules
+    const specialRules = reactJson.customRules.reduce((acc, rule, index) => {
+        acc[index] = {
+            name: rule.name,
+            description : rule.text
+        };
+        return acc;
+    }, {});
+
+     converted["system.props.specialRules"] = specialRules;
+
+     // add shield and armor custom qualitiy to special rules too
+        if (reactJson.selected_armor?.armor) {
+            const armorQuality = reactJson.selected_armor.customQualitiy;
+            if (armorQuality) {
+                converted["system.props.specialRules"][Object.keys(specialRules).length] = {
+                    name: "Armor Quality",
+                    description: armorQuality
+                };
+            }
+        }
+
+        if (reactJson.selected_shield?.shield) {
+            const shieldQuality = reactJson.selected_shield.customQualitiy;
+            if (shieldQuality) {
+                converted["system.props.specialRules"][Object.keys(specialRules).length] = {
+                    name: "Shield Quality",
+                    description: shieldQuality
+                };
+            }
+        }
 
     // calculate index offset, which is the largest index in basicAttacks
     const offset = Object.keys(basicAttacks).reduce((acc, key) => {
@@ -314,7 +549,7 @@ const parseNPCJsonToFoundryFormat = (reactJson) => {
     const weaponAttacks = reactJson.weaponAttacks.reduce((acc, weapon, index) => {
         acc[index + offset] = {
             attackName: weapon.name || "",
-            damageBonus: weapon.weapon.damage.match(/\d+/)?.[0] || 0 + (weapon.extraDamage ? 5 : 0) + Math.floor(reactJson.level / 20) * 5,
+            damageBonus: parseInt(weapon.weapon.damage.match(/\d+/)?.[0] || 0) + (weapon.extraDamage ? 5 : 0) + Math.floor(reactJson.level / 20) * 5,
             isRanged: weapon.weapon.reach === "Ranged",
             // if accuracy check is in the form of "STAT + STAT + X", account for the +X
             accuracyModifier: accuracyModifier + (weapon.weapon.accuracy.split(" + ").length > 2 ? parseInt(weapon.weapon.accuracy.split(" + ")[2]) : 0),

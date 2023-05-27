@@ -118,3 +118,28 @@
   text-decoration: inherit;
 }
 
+.damage-button {
+  width: auto;
+  line-height: auto;
+  margin: 0 1px;
+  background: rgba(255, 255, 240, 0.8);
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 3px;
+  font-size: var(--font-size-14);
+  font-family: var(--font-primary);
+  cursor: pointer;
+}
+
+.damage-modifier {
+  width: 50px !important;
+  display:inline-block !important;
+}
+
+.token-name {
+    padding: 10px 0;
+}
+
+.token-name-text {
+    font-weight: bold;
+    margin-right: 10px;
+}
