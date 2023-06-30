@@ -104,7 +104,36 @@ NPC Object Structure:
                 icon: '<i class="fas fa-check"></i>',
                 label: 'Close',
                 callback: () => { }
-            }
+            },
+            createJournalEntry: {
+              icon: '<i class="fas fa-book"></i>',
+              label: 'Create Journal Entry',
+              callback: async () => {
+                  const journalName = 'Monster Journal';
+                  const entryName = token.actor.name; // The entry name will be the monster's name
+                  const htmlContent = content; // The content you built above
+                  let journal = game.journal.getName(journalName);
+                  if (!journal) {
+                      journal = await Journal.create({
+                          name: journalName,
+                          folder: null,
+                          sort: 0,
+                          permission: CONST.ENTITY_PERMISSIONS.OBSERVER,
+                          flags: {}
+                      });
+                  }
+                  const entryData = {
+                      name: entryName,
+                      content: htmlContent,
+                      img: 'icons/svg/book.svg', // Optional: Set an icon for the journal entry
+                      journal: journal.id
+                  };
+                  const newEntry = await JournalEntry.create(entryData);
+                  if (newEntry) {
+                      newEntry.sheet.render(true);
+                  }
+              }
+          }
         },
         default: 'close'
     }, {

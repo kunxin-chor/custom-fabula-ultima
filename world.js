@@ -8,11 +8,9 @@ Hooks.on('ready', () => {
 });
 
 Hooks.on('preCreateChatMessage', (document, data) => {
-    console.log("document =", document);
-    
-    const customRoll = document.content.includes("custom-system-roll");
-    if(customRoll) {
-        console.log("adding target names to roll message")
+
+    const customRoll = document.content.includes("fb-roll");
+    if (customRoll) {
         // Get the game's targeted tokens
         let targetedTokens = game.user.targets;
 
@@ -25,8 +23,7 @@ Hooks.on('preCreateChatMessage', (document, data) => {
         } else {
             attackingToken = game.user.character.getActiveTokens()[0];
         }
-        console.log(attackingToken);
-        
+
 
         // Create a container for the target names as a string
         let targetNames = "<ul class='target-names'>";
@@ -38,26 +35,29 @@ Hooks.on('preCreateChatMessage', (document, data) => {
         let damageNumberMessage = document.content.match(/<span class="hidden roll-damage">(\d+)<\/span>/);
         const rollResult = rollResultMessage ? parseInt(rollResultMessage[1]) : null;
         const targetedDefense = targetDefenseMessage ? targetDefenseMessage[1] : null;
-        const damageType = damageTypeMessage ? damageTypeMessage[1] : "untyped";      
+        const damageType = damageTypeMessage ? damageTypeMessage[1] : "untyped";
         let mpCostMessage = document.content.match(/<span class="hidden roll-MP-cost">(\d+)<\/span>/);
-        let mpCost = mpCostMessage ? parseInt(mpCostMessage[1]) : null;       
+        let mpCost = mpCostMessage ? parseInt(mpCostMessage[1]) : null;
         // add a button to deduct button inside the roll message if the span with class "roll-MP-cost" exists into
         // the span.mp-cost-button
         if (mpCost) {
-       
+
             console.log("MP cost =", mpCost);
             // embed the _id of the attacking actor in the button
-            let mpCostButton = `<button class="deduct-mp ml-1 damage-button" data-token-id="${attackingToken.document._id}" data-mp-cost="${mpCost}">Apply</button>`;
+            let mpCostButton = `<button class="deduct-mp" data-token-id="${attackingToken.document._id}" data-mp-cost="${mpCost}"><i class="fas fa-arrow-down"></i> x1</button>
+            <button class="deduct-mp ml-1" data-token-id="${attackingToken.document._id}" data-mp-cost="${mpCost * 2}"><i class="fas fa-arrow-down"></i> x2</button>
+            <button class="deduct-mp ml-1" data-token-id="${attackingToken.document._id}" data-mp-cost="${mpCost * 3}"><i class="fas fa-arrow-down"></i> x3</button>`;
+
             // add the button to the roll message
             document.content = document.content.replace(/<span class="mp-cost-button"><\/span>/, mpCostButton);
         }
 
         // Loop through each targeted token, add its details and name to the roll message
-        for(let token of targetedTokens) {        
+        for (let token of targetedTokens) {
 
             // Create an element for the token's name as a string
             let tokenName = "";
-            tokenName += `<li class='token-name' data-token-id='${token.id}'>`; // Store the token's ID for later use
+            tokenName += `<li class='token-name' data-token-id='${token.document.uuid}'>`; // Store the token's ID for later use
 
             // Check if the attack hit or missed
 
@@ -80,31 +80,36 @@ Hooks.on('preCreateChatMessage', (document, data) => {
                     key = "currentDefense";
                     break;
             }
-                       
+
             let hitOrMiss = "hit";
             if (key != "N/A" && key != "n/a") {
                 hitOrMiss = (rollResult >= token.actor.system.props[key]) ? "hit" : "miss";
-            }                      
+            }
 
             // determine the target's affinity to the damage type
             // make sure it's not "n/a" damage type first before finding the affinitiy
             let affinity = damageType.toLowerCase() != "untyped" ? token.actor.system.props[damageType + "Affinity"][0].toLowerCase()
-              : "n";
+                : "n";
             if (affinity == "-") {
                 affinity = "n";
-            }       
+            }
 
-            // Add hit or miss result to the token's name
-            tokenName += `${token.name} - ${hitOrMiss} (affinity: ${affinity})
-                <div>
-                    <i class="fa-solid fa-plus-minus"></i>
-                    <input type="number" class="damage-modifier" value="0" />
-                    <input type="radio" value="2"   name="damage-multipler-${document.timestamp}" class="damage-multiplier" /> x2
-                    <input type="radio" value="1"   name="damage-multipler-${document.timestamp}" class="damage-multiplier" checked /> x1
-                    <input type="radio" value="0.5" name="damage-multipler-${document.timestamp}" class="damage-multiplier" /> x0.5
-                    <button class="damage-button">Apply</button>
-                </div>
-            </li>`;
+
+            // Add hit or miss result to the token's name     
+            tokenName += `${token.name} - ${hitOrMiss} (affinity: ${affinity})`;
+
+            // Display button
+            tokenName += `
+                    <div>
+                        <i class="fa-solid fa-plus-minus"></i>
+                        <input type="number" class="damage-modifier" value="0" />
+                        <input type="radio" value="2"   name="damage-multipler-${document.timestamp}-${token.document.uuid}" class="damage-multiplier" /> x2
+                        <input type="radio" value="1"   name="damage-multipler-${document.timestamp}-${token.document.uuid}" class="damage-multiplier" checked /> x1
+                        <input type="radio" value="0.5" name="damage-multipler-${document.timestamp}-${token.document.uuid}" class="damage-multiplier" /> x0.5
+                        <button class="damage-button">Apply</button>
+                    </div>
+                </li>`;
+
 
             // Add the token name to the container
             targetNames += tokenName;
@@ -124,17 +129,17 @@ Hooks.on('preCreateChatMessage', (document, data) => {
     }
 });
 
-Hooks.on('renderChatMessage', (message, element, data) => {
-   
-        // check if the deduct MP button exists. 
-        // if it does, add a click listener to it
-        let mpCostButton = element[0].querySelector(".deduct-mp");
-        if (mpCostButton) {
+Hooks.on('renderChatMessage', async (message, element, data) => {
+
+    // check if the deduct MP button exists. 
+    // if it does, add a click listener to it
+    let mpCostButtons = element[0].querySelectorAll(".deduct-mp");
+    if (mpCostButtons.length > 0 && (message.isOwner || message.speaker.actor == game.user.character._id)) {
+        for (let mpCostButton of mpCostButtons) {
             mpCostButton.addEventListener("click", (event) => {
                 // get the actor ID from the button
-                const tokenId = event.target.dataset.tokenId;
-                console.log("t")
-                const mpCost = event.target.dataset.mpCost;
+                const tokenId = event.currentTarget.dataset.tokenId;
+                const mpCost = event.currentTarget.dataset.mpCost;
                 // get the actor from the token ID
                 const actor = canvas.tokens.get(tokenId).actor;
                 // deduct the MP cost from the actor
@@ -145,49 +150,71 @@ Hooks.on('renderChatMessage', (message, element, data) => {
                 });
             });
         }
+    } else {
+        for (let btn of mpCostButtons) {
+            btn?.remove();
+        }        
+    }
 
-        // add a hover listener to each of the token name
-        let tokenNames = element[0].querySelectorAll(".token-name");
-        for(let tokenName of tokenNames) {
-            tokenName.addEventListener("mouseenter", (event) => {
-                // hover the token using foundry VTT code
-                const tokenId = event.target.dataset.tokenId;
-                let token = canvas.tokens.get(tokenId);
-                token._onHoverIn(event);
-    
+
+    // add a hover listener to each of the token name
+    let tokenNames = element[0].querySelectorAll(".token-name");
+    for (let tokenName of tokenNames) {
+        // get the token ID from the data-token-id attribute
+        const tokenId = tokenName.dataset.tokenId;
+        let token = await fromUuid(tokenId);
+        if (token) {
+            tokenName.addEventListener("mouseenter", async (event) => {
+
+                let sceneToken = canvas.tokens.get(token._id);
+                sceneToken._onHoverIn(event);
+
             })
-            tokenName.addEventListener("mouseleave", (event) => {
-                // hover the token using foundry VTT code
-                const tokenId = event.target.dataset.tokenId;
-                let token = canvas.tokens.get(tokenId);
-                token._onHoverOut(event);
+            tokenName.addEventListener("mouseleave", async (event) => {
+
+                let sceneToken = canvas.tokens.get(token._id);
+                sceneToken._onHoverOut(event);
             })
 
-            // add a click listener to each of the damage buttons
-            let damageButtons = tokenName.querySelectorAll(".damage-button");
-            
-            // get the damage amount from the <span class="hidden roll-damage"> element
-            let damage = element[0].querySelector(".roll-damage").innerHTML;
+        }
 
-            for(let damageButton of damageButtons) {
+        // add a click listener to each of the damage buttons
+        let damageButtons = tokenName.querySelectorAll(".damage-button");
+
+        // get the damage amount from the <span class="hidden roll-damage"> element
+        let damage = element[0].querySelector(".roll-damage").innerHTML;
+
+        for (let damageButton of damageButtons) {
+            // only add the event listener if the player is GM or if they own the token
+            const tokenId = damageButton.parentElement.parentElement.dataset.tokenId;
+            const token = await fromUuid(tokenId);
+            if (token?.isOwner) {
                 damageButton.addEventListener("click", (event) => {
+                    // get the token id from the button
+                    // const tokenId = damageButton.parentElement.parentElement.dataset.tokenId;
+                    // const token = canvas.tokens.get(tokenId);
+
+                    if (!token.isOwner) {
+                        ui.notifications.error("You do not own this token");
+                        return;
+                    }
+
                     // get the damage multiplier
                     let damageMultiplier = 1;
                     let selectedDamageMultiplier = tokenName.querySelector(".damage-multiplier:checked");
                     if (selectedDamageMultiplier) {
                         damageMultiplier = selectedDamageMultiplier.value;
                     }
-                    
+
                     // get the damage modifier
                     let damageModifier = tokenName.querySelector(".damage-modifier").value;
                     damageModifier = parseInt(damageModifier);
                     damage = parseInt(damage);
-                    
+
                     console.log(damage, damageModifier, damageMultiplier);
 
                     // update the token's actor
-                    const tokenId = event.target.parentElement.parentElement.dataset.tokenId;
-                    let token = canvas.tokens.get(tokenId);
+
                     let actor = token.actor;
                     // if actor.system.props.rank is defined, then it's a NPC (then take HP)
                     // otherwise it's a PC (then take currentHp)
@@ -196,15 +223,124 @@ Hooks.on('renderChatMessage', (message, element, data) => {
                     let newHP = currentHP - (damage + damageModifier) * damageMultiplier;
                     console.log(hitPointKey, currentHP, newHP);
                     actor.update({
-                         [`system.props.${hitPointKey}`]: newHP
+                        [`system.props.${hitPointKey}`]: newHP
                     });
 
-                })
+                });
+            } else {
+                damageButton.remove();
             }
+
+
         }
-    
+    }
+
 });
 
+const renderTokenEffects = (actor, token = null) => {
+
+    // if (!token) {
+    //     return;
+    // }
+
+    // check if the actor's HP have changed
+    console.log(actor.system.props)
+    let hp = actor.system.props.currentHp || actor.system.props.HP;
+    let maxHp = actor.system.props.maxHp || actor.system.props.maxHP;
+    // Check if the actor's tokens have less than 50% hit points
+
+    if (maxHp) {
+        if ((hp / maxHp) < 0.5) {
+
+            // Add a status effect to all of the actor's tokens.
+            // The 'icons/svg/skull.svg' is an example, replace it with the path to the icon you want to use
+            // actor.getActiveTokens(true).forEach(token => {
+            //     if (!token.data.effects.include("icons/svg/blood.svg")) {
+            //         const { x, y } = token;
+            //         canvas.interface.createScrollingText({ x: x, y: y }, "+Crisis")
+            //         token.toggleEffect('icons/svg/blood.svg')
+            //     }
+
+            // });
+
+            if (!token.effects.includes("icons/svg/blood.svg")) {
+                const { x, y } = token;
+                canvas.interface.createScrollingText({ x: x, y: y }, "+Crisis")
+                token.object.toggleEffect('icons/svg/blood.svg')
+            }
+
+        } else {
+            // actor.getActiveTokens(true).forEach(token => {
+            //     if (token.data.effects.include("icons/svg/blood.svg")) {
+            //         const { x, y } = token;
+            //         canvas.interface.createScrollingText({ x: x, y: y }, "-Crisis")
+            //         token.toggleEffect('icons/svg/blood.svg', { active: false })
+            //     }
+            // }
+            // );
+
+            if (token.effects.includes("icons/svg/blood.svg")) {
+                const { x, y } = token;
+                canvas.interface.createScrollingText({ x: x, y: y }, "-Crisis")
+                token.object.toggleEffect('icons/svg/blood.svg', { active: false })
+            }
+        }
+    }
+
+
+    // check if the actor have shields
+    if (actor.system.props?.shields > 0) {
+
+        // actor.getActiveTokens(true).forEach(token => {
+        //     if (!token.data.effects.include("icons/svg/shield.svg")) {
+        //         token.toggleEffect('icons/svg/shield.svg')
+        //         const { x, y } = token;
+        //         canvas.interface.createScrollingText({ x: x, y: y }, "+Shield")
+        //     }
+
+        // });
+        if (!token.effects.includes("icons/svg/shield.svg")) {
+            token.object.toggleEffect('icons/svg/shield.svg')
+            const { x, y } = token;
+            canvas.interface.createScrollingText({ x: x, y: y }, "+Shield")
+        }
+    } else {
+        // actor.getActiveTokens(true).forEach(token => {
+        //     if (token.data.effects.include("icons/svg/shield.svg")) {
+        //         token.toggleEffect('icons/svg/shield.svg', { active: false })
+        //         const { x, y } = token;
+        //         canvas.interface.createScrollingText({ x: x, y: y }, "-Shield")
+        //     }
+
+        // });
+        if (token.effects.includes("icons/svg/shield.svg")) {
+            token.object.toggleEffect('icons/svg/shield.svg', { active: false })
+            const { x, y } = token;
+            canvas.interface.createScrollingText({ x: x, y: y }, "-Shield")
+        }
+    }
+}
+
+Hooks.on('updateActor', (actor, updatedData) => {
+    console.log(actor);
+    if (updatedData.system) {
+        console.log(actor.getActiveTokens(true)[0]);
+        renderTokenEffects(actor, actor.token ? actor.token : actor.getActiveTokens(true)[0]?.document);
+    }
+});
+
+Hooks.on('drawToken', (token) => {
+    // dump all the arguments 
+    
+    if (token) {
+        let actor = Object.keys(token.document.actorData).length ? token.document.actorData : token.actor; 
+
+        if (actor) {
+            renderTokenEffects(actor, token.document);
+        }
+    }
+
+});
 
 
 Hooks.on('renderActorSheet', (app, html, data) => {
@@ -489,33 +625,33 @@ const parseNPCJsonToFoundryFormat = (reactJson) => {
     const specialRules = reactJson.customRules.reduce((acc, rule, index) => {
         acc[index] = {
             name: rule.name,
-            description : rule.text
+            description: rule.text
         };
         return acc;
     }, {});
 
-     converted["system.props.specialRules"] = specialRules;
+    converted["system.props.specialRules"] = specialRules;
 
-     // add shield and armor custom qualitiy to special rules too
-        if (reactJson.selected_armor?.armor) {
-            const armorQuality = reactJson.selected_armor.customQualitiy;
-            if (armorQuality) {
-                converted["system.props.specialRules"][Object.keys(specialRules).length] = {
-                    name: "Armor Quality",
-                    description: armorQuality
-                };
-            }
+    // add shield and armor custom qualitiy to special rules too
+    if (reactJson.selected_armor?.armor) {
+        const armorQuality = reactJson.selected_armor.customQualitiy;
+        if (armorQuality) {
+            converted["system.props.specialRules"][Object.keys(specialRules).length] = {
+                name: "Armor Quality",
+                description: armorQuality
+            };
         }
+    }
 
-        if (reactJson.selected_shield?.shield) {
-            const shieldQuality = reactJson.selected_shield.customQualitiy;
-            if (shieldQuality) {
-                converted["system.props.specialRules"][Object.keys(specialRules).length] = {
-                    name: "Shield Quality",
-                    description: shieldQuality
-                };
-            }
+    if (reactJson.selected_shield?.shield) {
+        const shieldQuality = reactJson.selected_shield.customQualitiy;
+        if (shieldQuality) {
+            converted["system.props.specialRules"][Object.keys(specialRules).length] = {
+                name: "Shield Quality",
+                description: shieldQuality
+            };
         }
+    }
 
     // calculate index offset, which is the largest index in basicAttacks
     const offset = Object.keys(basicAttacks).reduce((acc, key) => {
@@ -615,7 +751,7 @@ const parseNPCJsonToFoundryFormat = (reactJson) => {
     };
 
     for (const key in reactJson.elementalAffinities) {
-        const convertedKey = key + "Affinity";    
+        const convertedKey = key + "Affinity";
         if (convertedAffinities.hasOwnProperty("system.props." + convertedKey)) {
             convertedAffinities["system.props." + convertedKey] = affinityShortcodes[reactJson.elementalAffinities[key]];
         }

@@ -243,6 +243,8 @@ MODIFIED ABILITY ROLL
 ${!item.fullDescription}$
 </div>
 
+<p class="mp-cost">MP: ${item.mpCost}$<span class="mp-cost-button"></span></p>
+
 ${#dice1:= equalText(string(item.stat1) ,'DEX') == true ? ref('currentDex') : 0}$
 ${#dice1:= equalText(string(item.stat1) ,'INS') == true and isZero(dice1) == true ? ref('currentIns') : dice1}$
 ${#dice1:= equalText(string(item.stat1) ,'MIG') == true and isZero(dice1) == true ? ref('currentMig') : dice1}$
@@ -272,6 +274,7 @@ ${!D1 == D2 and D1 == 1 ? string('<p><b>FUMBLE<b></p>'): string('')}$
 <span class="hidden roll-HR">${! max(D1, D2)}$</span>
 <span class="hidden roll-target-defense">${! item.targetDefense}$</span>
 <span class="hidden roll-damage-type">${! item.damageType}$</span>
+<span class="hidden roll-MP-cost">${! item.mpCost}$</span>
 
 MODIFIED MONSTER ATTACK
 <h2>${!sameRow('attackName')}$</h2>
