@@ -685,7 +685,8 @@ const parseNPCJsonToFoundryFormat = (reactJson) => {
     const weaponAttacks = reactJson.weaponAttacks.reduce((acc, weapon, index) => {
         acc[index + offset] = {
             attackName: weapon.name || "",
-            damageBonus: parseInt(weapon.weapon.damage.match(/\d+/)?.[0] || 0) + (weapon.extraDamage ? 5 : 0) + Math.floor(reactJson.level / 20) * 5,
+            damageBonus: parseInt(weapon.weapon.damage.match(/\d+/)?.[0] || 0) 
+                    + (weapon.extraDamage ? 5 : 0) + Math.floor(reactJson.level / 20) * 5,
             isRanged: weapon.weapon.reach === "Ranged",
             // if accuracy check is in the form of "STAT + STAT + X", account for the +X
             accuracyModifier: accuracyModifier + (weapon.weapon.accuracy.split(" + ").length > 2 ? parseInt(weapon.weapon.accuracy.split(" + ")[2]) : 0),
@@ -713,7 +714,7 @@ const parseNPCJsonToFoundryFormat = (reactJson) => {
             targets: spell.targets || 0,
             effect: spell.type,
             description: spell.effect,
-            potency: spell.damage,
+            potency: spell.damage + Math.floor(reactJson.level / 20) * 5,
             element: spell.element,
             checkModifier: offensiveMagicCheckBonus,
         };
@@ -748,6 +749,7 @@ const parseNPCJsonToFoundryFormat = (reactJson) => {
         "system.props.shakenAffinity": "-",
         "system.props.dazedAffinity": "-",
         "system.props.slowAffinity": "-",
+        "system.props.untypedAffinity": "-",
     };
 
     for (const key in reactJson.elementalAffinities) {
